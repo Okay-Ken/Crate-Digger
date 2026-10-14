@@ -30,7 +30,7 @@ function toLine(title, channel) {
 export default async (req) => {
   const blocked = await requirePro(req);
   if (blocked) return blocked;
-  const key = Netlify.env.get("YOUTUBE_API_KEY");
+  const key = (Netlify.env.get("YOUTUBE_API_KEY") || process.env.YOUTUBE_API_KEY || "").trim().replace(/^["']|["']$/g, "");
   if (!key) return json({ error: "The site owner hasn't added a YouTube API key yet." }, 500);
 
   const link = new URL(req.url).searchParams.get("url") || "";
