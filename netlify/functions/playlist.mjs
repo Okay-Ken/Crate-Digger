@@ -6,7 +6,7 @@ import { requirePro } from "../lib/license.mjs";
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "private, max-age=600" },
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 
 function playlistId(input) {

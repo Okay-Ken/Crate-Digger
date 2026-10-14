@@ -339,7 +339,7 @@ async function importLink(){
   status.classList.remove('err'); status.textContent = 'Pulling tracks…';
   $('import').disabled = true;
   try{
-    const res = await api(endpoint + '?url=' + encodeURIComponent(link));
+    const res = await api(endpoint + '?url=' + encodeURIComponent(link) + '&t=' + Date.now(), {cache:'no-store'});
     const data = await res.json();
     if(!res.ok || data.error){ throw new Error(data.error || 'Import failed.'); }
     const before = isExample ? 0 : tracks.length;

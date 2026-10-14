@@ -7,7 +7,7 @@ import { requirePro } from "../lib/license.mjs";
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "private, max-age=86400" },
+    headers: { "content-type": "application/json", "cache-control": status === 200 && !body.busy ? "private, max-age=86400" : "no-store" },
   });
 
 const norm = (s) =>
