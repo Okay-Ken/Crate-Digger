@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crate Digger</title>
+<meta name="description" content="Paste a playlist link. Get one-tap store links for every track.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column — a record-store want list. Paste box up top, then one row per track with a row of store buttons. */
+:root{
+  --bg:#e9ebee; --panel:#f7f8fa; --ink:#14171c; --muted:#5d6572; --line:#cfd4dc;
+  --accent:#2f47ff; --accent-ink:#ffffff; --got:#1d8a52; --chip:#dde1e7;
+  --display:"Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body:"Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#8c94a2; --line:#2a2f38;
+  --accent:#6f80ff; --accent-ink:#0b0d12; --got:#3fc483; --chip:#222731; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#8c94a2; --line:#2a2f38;
+  --accent:#6f80ff; --accent-ink:#0b0d12; --got:#3fc483; --chip:#222731; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:820px;margin:0 auto;padding-block:28px 64px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--display);font-stretch:125%;font-weight:900;font-size:clamp(30px,8vw,48px);
+  line-height:.95;letter-spacing:-.01em;margin:0;text-transform:uppercase;text-wrap:balance}
+h1 span{color:var(--accent)}
+.lede{color:var(--muted);margin:6px 0 0;max-width:60ch}
+.label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+.paste{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+textarea{width:100%;box-sizing:border-box;min-height:120px;resize:vertical;border:1px solid var(--line);border-radius:6px;
+  background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;padding:10px;line-height:1.5}
+textarea:focus,input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;cursor:pointer}
+.btn{font-family:var(--display);font-stretch:110%;font-weight:700;font-size:14px;border-radius:6px;padding:9px 14px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.hint{font-size:13px;color:var(--muted)}
+
+.stores{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.bar{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.count{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.meter{height:4px;background:var(--line);border-radius:4px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--got);width:0;transition:width .3s}
+.example{font-family:var(--mono);font-size:11px;background:var(--chip);padding:3px 8px;border-radius:4px;color:var(--muted)}
+
+ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+li.track{display:grid;grid-template-columns:34px 1fr;gap:4px 10px;padding:14px 0;border-bottom:1px solid var(--line)}
+.num{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:9px;font-variant-numeric:tabular-nums}
+.body{min-width:0;display:flex;flex-direction:column;gap:8px}
+.head{display:flex;gap:8px;align-items:center}
+.q{flex:1;min-width:0;font-family:var(--display);font-stretch:100%;font-weight:700;font-size:16px;color:var(--ink);
+  background:transparent;border:1px solid transparent;border-radius:5px;padding:6px 6px;margin-left:-6px}
+.q:hover{border-color:var(--line)}
+.got{flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:6px 9px;border-radius:5px;
+  border:1px solid var(--line);background:transparent;color:var(--muted)}
+.got[aria-pressed="true"]{background:var(--got);border-color:var(--got);color:#fff}
+.links{display:flex;flex-wrap:wrap;gap:6px}
+.links a{font-family:var(--mono);font-size:12px;text-decoration:none;padding:6px 10px;border-radius:5px;background:var(--chip);color:var(--ink);border:1px solid transparent}
+.links a:first-child{background:var(--accent);color:var(--accent-ink)}
+.links a:hover{border-color:var(--accent)}
+li.done .q{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
+li.done .links{opacity:.45}
+.x{flex:none;background:none;border:0;color:var(--muted);font-size:18px;line-height:1;padding:4px 6px}
+.empty{padding:28px 0;color:var(--muted)}
+.foot{font-size:13px;color:var(--muted);max-width:62ch}
+@media (prefers-reduced-motion: reduce){.meter i{transition:none}}
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+.linkin{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;padding:10px}
+.apple{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.apple::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--line)}
+.apple.yes::before{background:var(--got)}
+.apple a{color:var(--got);font-weight:600;text-decoration:none}
+.err{color:#c43d3d}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="label">Want list → store links</div>
+    <h1>Crate <span>Digger</span></h1>
+    <p class="lede">Drop in a playlist link or paste track names. Every track gets one-tap buttons that open straight to that song on each store. Tap "Got it" when it's in your library.</p>
+  </header>
+
+  <section class="paste" aria-label="Import a playlist">
+    <label class="label" for="link">Paste a playlist link</label>
+    <div class="row">
+      <input id="link" class="linkin" inputmode="url" autocomplete="off" placeholder="youtube.com/playlist?list=… or soundcloud.com/…/sets/…">
+      <button class="btn primary" id="import">Import</button>
+    </div>
+    <div class="hint" id="importStatus">Works with public or unlisted YouTube and YouTube Music playlists.</div>
+  </section>
+
+  <section class="paste" aria-label="Add tracks">
+    <label class="label" for="input">Or paste track names, one per line</label>
+    <textarea id="input" placeholder="Sub Focus - Overcome&#10;Dimension - Organ (Official Video)&#10;1. Chase &amp; Status - Baddadan [HD]"></textarea>
+    <div class="row">
+      <button class="btn primary" id="add">Add to list</button>
+      <button class="btn" id="replace">Replace list</button>
+      <label class="btn" for="file" style="cursor:pointer">Load .txt / .csv</label>
+      <input type="file" id="file" accept=".txt,.csv,text/plain" hidden>
+    </div>
+    <div class="hint">YouTube junk like (Official Video), [HD], "| UKF Release", numbering and timestamps gets stripped. Remix and VIP tags stay.</div>
+  </section>
+
+  <section aria-label="Stores" style="display:flex;flex-direction:column;gap:8px">
+    <div class="label">Stores to show (first one = blue button)</div>
+    <div class="stores" id="stores"></div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <div class="bar">
+      <div class="row"><strong style="font-family:var(--display);font-stretch:115%;font-size:18px">The list</strong><span class="example" id="exTag" hidden>Example tracks</span></div>
+      <div class="row">
+        <span class="count" id="count"></span>
+        <button class="btn" id="copy" style="padding:5px 10px;font-size:12px">Copy still-needed</button>
+        <button class="btn" id="clear" style="padding:5px 10px;font-size:12px">Clear</button>
+      </div>
+    </div>
+    <div class="meter"><i id="meter"></i></div>
+    <ol id="list"></ol>
+    <div class="row" id="confirmClear" hidden>
+      <span class="hint">Clear the whole list?</span>
+      <button class="btn primary" id="yesClear">Yes, clear</button>
+      <button class="btn" id="noClear">Keep it</button>
+    </div>
+  </section>
+
+  <p class="foot">Edit any track name in place if the search comes up wrong; the buttons update as you type. Bootlegs and edits usually live on SoundCloud or Bandcamp, so the "Free DL" button searches for the producer's download gate.</p>
+</div>
+
+<script>
+const STORES = [
+  {id:'beatport', name:'Beatport', url:q=>`https://www.beatport.com/search?q=${q}`},
+  {id:'bandcamp', name:'Bandcamp', url:q=>`https://bandcamp.com/search?q=${q}&item_type=t`},
+  {id:'juno', name:'Juno', url:q=>`https://www.junodownload.com/search/?q%5Ball%5D%5B%5D=${q}`},
+  {id:'traxsource', name:'Traxsource', url:q=>`https://www.traxsource.com/search?term=${q}`},
+  {id:'qobuz', name:'Qobuz', url:q=>`https://www.qobuz.com/us-en/search?q=${q}`},
+  {id:'7digital', name:'7digital', url:q=>`https://us.7digital.com/search?q=${q}`},
+  {id:'soundcloud', name:'SoundCloud', url:q=>`https://soundcloud.com/search/sounds?q=${q}`},
+  {id:'freedl', name:'Free DL', url:q=>`https://www.google.com/search?q=${q}%20(free%20download%20OR%20hypeddit%20OR%20toneden)`},
+];
+const DEFAULT_ON = ['beatport','bandcamp','juno','soundcloud','freedl'];
+const EXAMPLES = ['Sub Focus - Overcome','Dimension - Organ','Chase & Status - Baddadan','Wilkinson - Afterglow','Culture Shock - City Lights'];
+
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+const JUNK = /\b(official|video|audio|lyrics?|visuali[sz]er|music video|hd|hq|4k|1080p?|out now|free (download|dl)|premiere|release|clip|full song|copyright free|ncs)\b/i;
+let tracks = store.get('cd.tracks', null);
+let isExample = false;
+if(!tracks || !tracks.length){ tracks = EXAMPLES.map(q=>({q, got:false})); isExample = true; }
+let on = store.get('cd.stores', DEFAULT_ON);
+
+function clean(line){
+  let s = line.trim();
+  if(!s) return '';
+  s = s.replace(/^\s*\d+\s*[\.\)\-:]\s+/, '');
+  s = s.replace(/^\d{1,2}:\d{2}(:\d{2})?\s*/, '').replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, '');
+  s = s.replace(/^"(.*)"(,.*)?$/, '$1');
+  s = s.replace(/[\(\[\{]([^\)\]\}]*)[\)\]\}]/g, (m, inner) => JUNK.test(inner) ? '' : m);
+  s = s.split(/\s+[|│]\s+/)[0];
+  s = s.replace(/\s-\sTopic$/i, '');
+  s = s.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().replace(/\s*-\s*$/, '');
+  // YouTube Music export: "Artist · Artist · Artist - Title (feat. X)"
+  const cut = s.indexOf(' - ');
+  if(cut > 0){
+    const seen = new Set();
+    const artists = s.slice(0, cut).split(/\s*[·•]\s*/).filter(a=>{
+      const k = a.toLowerCase().replace(/[^a-z0-9]/g,'');
+      if(!k || seen.has(k)) return false; seen.add(k); return true;
+    }).slice(0, 2);
+    let title = s.slice(cut + 3)
+      .replace(/\s*[\(\[](feat\.?|ft\.?|featuring|with)\s[^\)\]]*[\)\]]/gi, '')
+      .replace(/\s+(ft\.?|feat\.?)\s+[^\(\[]*/i, ' ')
+      .replace(/\s*[\(\[]bonus track[\)\]]/i, '')
+      .replace(/\s+/g, ' ').trim();
+    s = artists.join(' & ') + ' - ' + title;
+  }
+  return s;
+}
+function parse(text){ return text.split(/\r?\n/).map(clean).filter(Boolean); }
+
+const $ = id => document.getElementById(id);
+function save(){ if(!isExample){ store.set('cd.tracks', tracks); } store.set('cd.stores', on); }
+
+function renderStores(){
+  const el = $('stores'); el.innerHTML = '';
+  STORES.forEach(s=>{
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = s.name;
+    b.setAttribute('aria-pressed', on.includes(s.id));
+    b.onclick = ()=>{
+      on = on.includes(s.id) ? on.filter(x=>x!==s.id) : STORES.map(x=>x.id).filter(x=>on.includes(x)||x===s.id);
+      save(); renderStores(); renderList();
+    };
+    el.appendChild(b);
+  });
+}
+
+function linksHTML(q){
+  const enc = encodeURIComponent(q);
+  return STORES.filter(s=>on.includes(s.id))
+    .map(s=>`<a href="${s.url(enc)}" target="_blank" rel="noopener">${s.name}</a>`).join('');
+}
+
+var renderList = function(){
+  const list = $('list'); list.innerHTML = '';
+  $('exTag').hidden = !isExample;
+  if(!tracks.length){ list.innerHTML = '<li class="empty">No tracks yet. Paste your playlist above and tap Add to list.</li>'; }
+  tracks.forEach((t,i)=>{
+    const li = document.createElement('li');
+    li.className = 'track' + (t.got ? ' done' : '');
+    li.innerHTML = `<div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div class="body">
+        <div class="head">
+          <input class="q" id="q${i}" aria-label="Track ${i+1} search text">
+          <button class="got" aria-pressed="${t.got}">${t.got ? 'Got it' : 'Need'}</button>
+          <button class="x" aria-label="Remove track">×</button>
+        </div>
+        <div class="links">${linksHTML(t.q)}</div>
+        <div class="apple"></div>
+      </div>`;
+    const inp = li.querySelector('.q'); inp.value = t.q;
+    inp.addEventListener('input', ()=>{ t.q = inp.value; li.querySelector('.links').innerHTML = linksHTML(t.q); commitExample(); save(); paintApple(li, t.q); queueApple(); });
+    li.querySelector('.got').onclick = ()=>{ t.got = !t.got; commitExample(); save(); renderList(); };
+    li.querySelector('.x').onclick = ()=>{ tracks.splice(i,1); commitExample(); save(); renderList(); };
+    paintApple(li, t.q);
+    list.appendChild(li);
+  });
+  const got = tracks.filter(t=>t.got).length;
+  $('count').textContent = `${got} / ${tracks.length} got`;
+  $('meter').style.width = tracks.length ? (got/tracks.length*100)+'%' : '0';
+}
+function commitExample(){ isExample = false; }
+
+function addLines(text, replace){
+  const items = parse(text);
+  if(!items.length) return;
+  if(replace || isExample) tracks = [];
+  const have = new Set(tracks.map(t=>t.q.toLowerCase()));
+  items.forEach(q=>{ if(!have.has(q.toLowerCase())){ tracks.push({q, got:false}); have.add(q.toLowerCase()); } });
+  isExample = false; save(); renderList(); $('input').value = '';
+}
+
+$('add').onclick = ()=> addLines($('input').value, false);
+$('replace').onclick = ()=> addLines($('input').value, true);
+$('file').onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = ()=> addLines(r.result, false); r.readAsText(f); e.target.value='';
+};
+$('clear').onclick = ()=> $('confirmClear').hidden = false;
+$('noClear').onclick = ()=> $('confirmClear').hidden = true;
+$('yesClear').onclick = ()=>{ tracks = []; isExample = false; save(); renderList(); $('confirmClear').hidden = true; };
+$('copy').onclick = async ()=>{
+  const text = tracks.filter(t=>!t.got).map(t=>t.q).join('\n');
+  try{ await navigator.clipboard.writeText(text); $('copy').textContent='Copied'; }
+  catch(e){ $('input').value = text; $('input').select(); $('copy').textContent='Selected above'; }
+  setTimeout(()=> $('copy').textContent='Copy still-needed', 1600);
+};
+
+// ---- Apple / iTunes availability ----
+let apple = store.get('cd.apple', {});
+let appleTimer = null, appleBusy = false;
+function paintApple(li, q){
+  const el = li.querySelector('.apple'); const r = apple[q.trim().toLowerCase()];
+  el.className = 'apple' + (r && r.found ? ' yes' : '');
+  if(!r){ el.textContent = 'iTunes: checking…'; return; }
+  if(!r.found){ el.textContent = 'Not found on iTunes'; return; }
+  const price = r.price ? `$${r.price.toFixed(2)}` : 'available';
+  el.innerHTML = `<span>iTunes</span><a href="${r.url}" target="_blank" rel="noopener">${price} · open</a>`;
+}
+function queueApple(){
+  clearTimeout(appleTimer);
+  appleTimer = setTimeout(nextApple, 1200);
+}
+async function nextApple(){
+  if(appleBusy) return;
+  const t = tracks.find(t => t.q.trim().length > 3 && !apple[t.q.trim().toLowerCase()]);
+  if(!t) return;
+  appleBusy = true;
+  const key = t.q.trim().toLowerCase();
+  try{
+    const r = await fetch('/api/itunes?q=' + encodeURIComponent(t.q.trim())).then(r => r.json());
+    if(r.busy){ appleBusy = false; appleTimer = setTimeout(nextApple, 20000); return; }
+    apple[key] = r.found ? {found:true, price:r.price, url:r.url} : {found:false};
+    store.set('cd.apple', apple);
+    document.querySelectorAll('li.track').forEach((li,i)=>{ if(tracks[i]) paintApple(li, tracks[i].q); });
+  }catch(e){ /* offline or local preview: leave as checking */ appleBusy = false; return; }
+  appleBusy = false;
+  appleTimer = setTimeout(nextApple, 3200);
+}
+
+// ---- Playlist link import ----
+async function importLink(){
+  const link = $('link').value.trim();
+  const status = $('importStatus');
+  if(!link){ status.textContent = 'Paste a playlist link first.'; return; }
+  const endpoint = /soundcloud\.com/i.test(link) ? '/api/soundcloud' : '/api/playlist';
+  status.classList.remove('err'); status.textContent = 'Pulling tracks…';
+  $('import').disabled = true;
+  try{
+    const res = await fetch(endpoint + '?url=' + encodeURIComponent(link));
+    const data = await res.json();
+    if(!res.ok || data.error){ throw new Error(data.error || 'Import failed.'); }
+    const before = isExample ? 0 : tracks.length;
+    addLines(data.tracks.join('\n'), false);
+    status.textContent = `Added ${tracks.length - before} tracks from "${data.title}".`;
+    $('link').value = '';
+  }catch(e){
+    status.classList.add('err'); status.textContent = e.message;
+  }
+  $('import').disabled = false;
+}
+$('import').onclick = importLink;
+$('link').addEventListener('keydown', e => { if(e.key === 'Enter') importLink(); });
+
+const _renderList = renderList;
+renderList = function(){ _renderList(); queueApple(); };
+
+renderStores(); renderList();
+</script>
+</body>
+</html>

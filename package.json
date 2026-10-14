@@ -1,0 +1,7 @@
+{
+  "name": "crate-digger",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Paste a playlist link, get one-tap store links for every track."
+}
