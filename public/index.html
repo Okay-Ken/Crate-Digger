@@ -83,6 +83,12 @@ body{margin:0}
 .apple.yes::before{background:var(--got)}
 .apple a{color:var(--got);font-weight:600;text-decoration:none}
 .err{color:#c43d3d}
+.pro{border:1px solid var(--accent);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--panel)}
+.pro h2{margin:0;font-family:var(--display);font-stretch:115%;font-size:18px}
+.pro ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+.pro .ok{color:var(--got);font-weight:700}
+a.btn{text-decoration:none;display:inline-block}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;padding:0}
 </style>
 </head>
 <body>
@@ -93,6 +99,22 @@ body{margin:0}
     <h1>Crate <span>Digger</span></h1>
     <p class="lede">Drop in a playlist link or paste track names. Every track gets one-tap buttons that open straight to that song on each store. Tap "Got it" when it's in your library.</p>
   </header>
+
+  <section class="pro" id="proLocked" aria-label="Unlock Pro" hidden>
+    <h2>Crate Digger Pro · $5</h2>
+    <ul>
+      <li>Paste a YouTube or SoundCloud playlist link and every track loads</li>
+      <li>See which tracks are on iTunes, with the price</li>
+      <li>Your list saves to your key, on every device</li>
+    </ul>
+    <div class="row">
+      <a class="btn primary" id="buy" href="#" target="_blank" rel="noopener" hidden>Get Pro</a>
+      <input id="keyIn" class="linkin" autocomplete="off" placeholder="Already paid? Paste your license key">
+      <button class="btn" id="unlock">Unlock</button>
+    </div>
+    <div class="hint" id="proStatus">Your key comes by email right after checkout.</div>
+  </section>
+  <div class="row hint" id="proOn" hidden><span class="ok">Pro unlocked</span><span>· your list saves to your key</span><button class="linkbtn" id="signOut">Remove key from this device</button></div>
 
   <section class="paste" aria-label="Import a playlist">
     <label class="label" for="link">Paste a playlist link</label>
@@ -196,7 +218,7 @@ function clean(line){
 function parse(text){ return text.split(/\r?\n/).map(clean).filter(Boolean); }
 
 const $ = id => document.getElementById(id);
-function save(){ if(!isExample){ store.set('cd.tracks', tracks); } store.set('cd.stores', on); }
+function save(){ if(!isExample){ store.set('cd.tracks', tracks); queueSync(); } store.set('cd.stores', on); }
 
 function renderStores(){
   const el = $('stores'); el.innerHTML = '';
@@ -277,7 +299,8 @@ $('copy').onclick = async ()=>{
 let apple = store.get('cd.apple', {});
 let appleTimer = null, appleBusy = false;
 function paintApple(li, q){
-  const el = li.querySelector('.apple'); const r = apple[q.trim().toLowerCase()];
+  const el = li.querySelector('.apple'); el.hidden = !pro; if(!pro) return;
+  const r = apple[q.trim().toLowerCase()];
   el.className = 'apple' + (r && r.found ? ' yes' : '');
   if(!r){ el.textContent = 'iTunes: checking…'; return; }
   if(!r.found){ el.textContent = 'Not found on iTunes'; return; }
@@ -289,13 +312,14 @@ function queueApple(){
   appleTimer = setTimeout(nextApple, 1200);
 }
 async function nextApple(){
-  if(appleBusy) return;
+  if(appleBusy || !pro) return;
   const t = tracks.find(t => t.q.trim().length > 3 && !apple[t.q.trim().toLowerCase()]);
   if(!t) return;
   appleBusy = true;
   const key = t.q.trim().toLowerCase();
   try{
-    const r = await fetch('/api/itunes?q=' + encodeURIComponent(t.q.trim())).then(r => r.json());
+    const r = await api('/api/itunes?q=' + encodeURIComponent(t.q.trim())).then(r => r.json());
+    if(r.pro){ appleBusy = false; return; }
     if(r.busy){ appleBusy = false; appleTimer = setTimeout(nextApple, 20000); return; }
     apple[key] = r.found ? {found:true, price:r.price, url:r.url} : {found:false};
     store.set('cd.apple', apple);
@@ -310,11 +334,12 @@ async function importLink(){
   const link = $('link').value.trim();
   const status = $('importStatus');
   if(!link){ status.textContent = 'Paste a playlist link first.'; return; }
+  if(!pro){ status.classList.add('err'); status.textContent = 'Playlist import is a Pro feature. Unlock it above.'; $('keyIn').focus(); return; }
   const endpoint = /soundcloud\.com/i.test(link) ? '/api/soundcloud' : '/api/playlist';
   status.classList.remove('err'); status.textContent = 'Pulling tracks…';
   $('import').disabled = true;
   try{
-    const res = await fetch(endpoint + '?url=' + encodeURIComponent(link));
+    const res = await api(endpoint + '?url=' + encodeURIComponent(link));
     const data = await res.json();
     if(!res.ok || data.error){ throw new Error(data.error || 'Import failed.'); }
     const before = isExample ? 0 : tracks.length;
@@ -332,7 +357,61 @@ $('link').addEventListener('keydown', e => { if(e.key === 'Enter') importLink();
 const _renderList = renderList;
 renderList = function(){ _renderList(); queueApple(); };
 
-renderStores(); renderList();
+// ---- Pro / license key ----
+let licenseKey = store.get('cd.key', '');
+let paywall = false, pro = true, syncTimer = null;
+function api(url, opts = {}){
+  opts.headers = Object.assign({}, opts.headers, licenseKey ? {'x-license-key': licenseKey} : {});
+  return fetch(url, opts);
+}
+function paintPro(){
+  $('proLocked').hidden = !paywall || pro;
+  $('proOn').hidden = !paywall || !pro;
+}
+async function checkLicense(){
+  try{
+    const r = await api('/api/license').then(r => r.json());
+    paywall = !!r.paywall;
+    if(r.buyUrl){ $('buy').href = r.buyUrl; $('buy').hidden = false; }
+    pro = !paywall || !!r.valid;
+  }catch(e){ paywall = false; pro = true; }
+  paintPro(); renderList();
+  if(paywall && pro) pullList();
+}
+async function unlock(){
+  const k = $('keyIn').value.trim();
+  if(!k){ $('proStatus').textContent = 'Paste the license key from your receipt email.'; return; }
+  $('proStatus').classList.remove('err'); $('proStatus').textContent = 'Checking your key…';
+  licenseKey = k;
+  try{
+    const r = await api('/api/license').then(r => r.json());
+    if(r.valid){ store.set('cd.key', k); pro = true; $('keyIn').value=''; paintPro(); renderList(); pullList(); }
+    else { licenseKey = ''; $('proStatus').classList.add('err'); $('proStatus').textContent = "That key didn't work. Check for typos, or contact support if you just paid."; }
+  }catch(e){ licenseKey = ''; $('proStatus').classList.add('err'); $('proStatus').textContent = "Couldn't check the key. Try again in a minute."; }
+}
+$('unlock').onclick = unlock;
+$('keyIn').addEventListener('keydown', e => { if(e.key === 'Enter') unlock(); });
+$('signOut').onclick = ()=>{ licenseKey = ''; store.set('cd.key', ''); pro = !paywall; paintPro(); renderList(); };
+
+async function pullList(){
+  try{
+    const r = await api('/api/lists').then(r => r.json());
+    if(!r.tracks || !r.tracks.length){ if(!isExample && tracks.length) pushList(); return; }
+    if(isExample || !tracks.length){ tracks = r.tracks; }
+    else {
+      const map = new Map(tracks.map(t => [t.q.toLowerCase(), t]));
+      r.tracks.forEach(t => { const m = map.get(t.q.toLowerCase()); if(m){ m.got = m.got || t.got; } else { tracks.push(t); } });
+    }
+    isExample = false; store.set('cd.tracks', tracks); renderList(); pushList();
+  }catch(e){}
+}
+function queueSync(){ if(!paywall || !pro) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushList, 1500); }
+async function pushList(){
+  if(!paywall || !pro || isExample) return;
+  try{ await api('/api/lists', {method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({tracks})}); }catch(e){}
+}
+
+renderStores(); renderList(); checkLicense();
 </script>
 </body>
 </html>

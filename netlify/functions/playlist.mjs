@@ -1,3 +1,4 @@
+import { requirePro } from "../lib/license.mjs";
 // GET /api/playlist?url=<YouTube or YouTube Music playlist link>
 // Returns { title, tracks: [ "Artist - Title", ... ] }
 // Needs the YOUTUBE_API_KEY environment variable in Netlify.
@@ -5,7 +6,7 @@
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "public, max-age=0, s-maxage=600" },
+    headers: { "content-type": "application/json", "cache-control": "private, max-age=600" },
   });
 
 function playlistId(input) {
@@ -27,6 +28,8 @@ function toLine(title, channel) {
 }
 
 export default async (req) => {
+  const blocked = await requirePro(req);
+  if (blocked) return blocked;
   const key = Netlify.env.get("YOUTUBE_API_KEY");
   if (!key) return json({ error: "The site owner hasn't added a YouTube API key yet." }, 500);
 

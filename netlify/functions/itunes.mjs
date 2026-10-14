@@ -1,12 +1,13 @@
+import { requirePro } from "../lib/license.mjs";
 // GET /api/itunes?q=<Artist - Title>
 // Checks Apple's free iTunes Search API and returns the best match:
 // { found: true, artist, title, price, currency, url } or { found: false }
-// No key needed. Results are cached on Netlify's CDN for a day.
+// No key needed. Results are cached in the browser for a day.
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "public, max-age=3600, s-maxage=86400" },
+    headers: { "content-type": "application/json", "cache-control": "private, max-age=86400" },
   });
 
 const norm = (s) =>
@@ -27,6 +28,8 @@ function score(query, r) {
 }
 
 export default async (req) => {
+  const blocked = await requirePro(req);
+  if (blocked) return blocked;
   const q = (new URL(req.url).searchParams.get("q") || "").trim().slice(0, 200);
   if (!q) return json({ error: "Missing track name." }, 400);
   try {

@@ -1,3 +1,4 @@
+import { requirePro } from "../lib/license.mjs";
 // GET /api/soundcloud?url=<SoundCloud playlist/set link>
 // Returns { title, tracks: [ "Artist - Title", ... ] }
 // Needs SOUNDCLOUD_CLIENT_ID and SOUNDCLOUD_CLIENT_SECRET in Netlify
@@ -27,6 +28,8 @@ async function getToken(id, secret) {
 }
 
 export default async (req) => {
+  const blocked = await requirePro(req);
+  if (blocked) return blocked;
   const id = Netlify.env.get("SOUNDCLOUD_CLIENT_ID");
   const secret = Netlify.env.get("SOUNDCLOUD_CLIENT_SECRET");
   if (!id || !secret) return json({ error: "SoundCloud import isn't turned on yet. Paste the track names instead." }, 501);
