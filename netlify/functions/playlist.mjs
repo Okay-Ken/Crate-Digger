@@ -40,10 +40,12 @@ export default async (req) => {
   const api = "https://www.googleapis.com/youtube/v3";
   let title = "YouTube playlist";
   try {
-    const meta = await fetch(`${api}/playlists?part=snippet&id=${id}&key=${key}`).then((r) => r.json());
+    const meta = await fetch(`${api}/playlists?part=snippet,contentDetails&id=${id}&key=${key}`).then((r) => r.json());
     if (meta.error) return json({ error: `YouTube said: ${meta.error.message}` }, 502);
     if (!meta.items?.length) return json({ error: "Playlist not found. Make sure it's set to Public or Unlisted." }, 404);
     title = meta.items[0].snippet.title;
+    const listed = meta.items[0].contentDetails?.itemCount ?? null;
+    let skipped = 0, received = 0, pages = 0;
 
     const tracks = [];
     let pageToken = "";
@@ -51,15 +53,17 @@ export default async (req) => {
       const url = `${api}/playlistItems?part=snippet&maxResults=50&playlistId=${id}&key=${key}${pageToken ? `&pageToken=${pageToken}` : ""}`;
       const data = await fetch(url).then((r) => r.json());
       if (data.error) return json({ error: `YouTube said: ${data.error.message}` }, 502);
+      pages++;
       for (const item of data.items || []) {
         const s = item.snippet || {};
-        if (/^(Deleted|Private) video$/i.test(s.title || "")) continue;
+        received++;
+        if (/^(Deleted|Private) video$/i.test(s.title || "") || !s.videoOwnerChannelTitle) { skipped++; continue; }
         tracks.push(toLine(s.title, s.videoOwnerChannelTitle));
       }
       if (!data.nextPageToken) break;
       pageToken = data.nextPageToken;
     }
-    return json({ source: "youtube", title, tracks });
+    return json({ source: "youtube", title, tracks, listed, received, skipped, pages });
   } catch (e) {
     return json({ error: "Couldn't reach YouTube. Try again in a minute." }, 502);
   }

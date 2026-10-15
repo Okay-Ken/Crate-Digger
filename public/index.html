@@ -344,7 +344,13 @@ async function importLink(){
     if(!res.ok || data.error){ throw new Error(data.error || 'Import failed.'); }
     const before = isExample ? 0 : tracks.length;
     addLines(data.tracks.join('\n'), false);
-    status.textContent = `Added ${tracks.length - before} tracks from "${data.title}".`;
+    const added = tracks.length - before;
+    const parts = [`Added ${added} tracks from "${data.title}".`];
+    if(data.listed != null) parts.push(`YouTube lists ${data.listed}, sent ${data.received ?? data.tracks.length}.`);
+    if(data.skipped) parts.push(`${data.skipped} are private, deleted or unavailable.`);
+    const dupes = data.tracks.length - added;
+    if(dupes > 0) parts.push(`${dupes} were repeats or already on your list.`);
+    status.textContent = parts.join(' ');
     $('link').value = '';
   }catch(e){
     status.classList.add('err'); status.textContent = e.message;
