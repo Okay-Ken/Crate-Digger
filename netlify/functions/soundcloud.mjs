@@ -32,7 +32,7 @@ export default async (req) => {
   if (blocked) return blocked;
   const id = Netlify.env.get("SOUNDCLOUD_CLIENT_ID");
   const secret = Netlify.env.get("SOUNDCLOUD_CLIENT_SECRET");
-  if (!id || !secret) return json({ error: "SoundCloud import isn't turned on yet. Paste the track names instead." }, 501);
+  if (!id || !secret) return json({ error: "SoundCloud links can't be imported directly yet." }, 501);
 
   const link = new URL(req.url).searchParams.get("url") || "";
   if (!/soundcloud\.com\//i.test(link)) return json({ error: "That doesn't look like a SoundCloud link." }, 400);

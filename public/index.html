@@ -83,6 +83,11 @@ body{margin:0}
 .apple.yes::before{background:var(--got)}
 .apple a{color:var(--got);font-weight:600;text-decoration:none}
 .err{color:#c43d3d}
+.help{border-top:1px dashed var(--line);padding-top:10px}
+.help summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--accent)}
+.help ol{margin:10px 0 6px;padding-left:22px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.help a{color:var(--accent)}
+.help p{margin:6px 0 0}
 .links a small{opacity:.65;font-size:10px;margin-left:3px}
 .shop{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:2px solid var(--accent);z-index:10;
   padding:12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))}
@@ -109,18 +114,19 @@ a.btn{text-decoration:none;display:inline-block}
   </header>
 
   <section class="pro" id="proLocked" aria-label="Unlock Pro" hidden>
-    <h2>Crate Digger Pro · $5</h2>
+    <h2>Crate Digger Pro · $5/month</h2>
     <ul>
       <li>Paste a YouTube or SoundCloud playlist link and every track loads</li>
       <li>See which tracks are on iTunes, with the price</li>
       <li>Your list saves to your key, on every device</li>
+      <li>Cancel anytime</li>
     </ul>
     <div class="row">
       <a class="btn primary" id="buy" href="#" target="_blank" rel="noopener" hidden>Get Pro</a>
       <input id="keyIn" class="linkin" autocomplete="off" placeholder="Already paid? Paste your license key">
       <button class="btn" id="unlock">Unlock</button>
     </div>
-    <div class="hint" id="proStatus">Your key comes by email right after checkout.</div>
+    <div class="hint" id="proStatus">Your license key comes by email right after checkout. It works as long as your subscription is active.</div>
   </section>
   <div class="row hint" id="proOn" hidden><span class="ok">Pro unlocked</span><span>· your list saves to your key</span><button class="linkbtn" id="signOut">Remove key from this device</button></div>
 
@@ -131,6 +137,16 @@ a.btn{text-decoration:none;display:inline-block}
       <button class="btn primary" id="import">Import</button>
     </div>
     <div class="hint" id="importStatus">Works with public or unlisted YouTube and YouTube Music playlists.</div>
+    <details class="help" id="help">
+      <summary>Spotify, Apple Music, SoundCloud, or a link that won't load? Do this instead</summary>
+      <ol>
+        <li>Open <a href="https://www.tunemymusic.com" target="_blank" rel="noopener">TuneMyMusic.com</a> and tap <b>Let's Start</b>.</li>
+        <li>Pick where your playlist lives (Spotify, Apple Music, SoundCloud, YouTube Music…), sign in, and choose the playlist.</li>
+        <li>For the destination, choose <b>Export to file</b> and save it as a TXT or CSV file.</li>
+        <li>Come back here and tap <b>Load .txt / .csv</b> below, or copy the song names and paste them in the box.</li>
+      </ol>
+      <p class="hint">Spotify only: <a href="https://exportify.net" target="_blank" rel="noopener">Exportify.net</a> also gives you a CSV file that works here. Spotify Wrapped and YouTube Music Recap playlists are private, so they always need this route.</p>
+    </details>
   </section>
 
   <section class="paste" aria-label="Add tracks">
@@ -423,7 +439,8 @@ async function importLink(){
     status.textContent = parts.join(' ');
     $('link').value = '';
   }catch(e){
-    status.classList.add('err'); status.textContent = e.message;
+    status.classList.add('err'); status.textContent = e.message + ' Try the steps below.';
+    $('help').open = true;
   }
   $('import').disabled = false;
 }
