@@ -245,7 +245,7 @@ const store = {
 const JUNK = /\b(official|video|audio|lyrics?|visuali[sz]er|music video|hd|hq|4k|1080p?|out now|free (download|dl)|premiere|release|clip|full song|copyright free|ncs)\b/i;
 let tracks = store.get('cd.tracks', null);
 let isExample = false;
-if(!tracks || !tracks.length){ tracks = EXAMPLES.map(q=>({q, got:false})); isExample = true; }
+if(!tracks) tracks = [];
 let on = store.get('cd.stores2', DEFAULT_ON).filter(id => STORES.some(x => x.id === id));
 let apple = store.get('cd.apple2', {});
 
@@ -329,7 +329,7 @@ function linksHTML(q){
 var renderList = function(){
   const list = $('list'); list.innerHTML = '';
   $('exTag').hidden = !isExample;
-  if(!tracks.length){ list.innerHTML = '<li class="empty">No tracks yet. Paste your playlist above and tap Add to list.</li>'; }
+  if(!tracks.length){ list.innerHTML = '<li class="empty">No tracks yet. Paste a playlist link above and tap Import, or paste track names and tap Add to list.</li>'; }
   tracks.forEach((t,i)=>{
     const li = document.createElement('li');
     li.className = 'track' + (t.got ? ' done' : '');
