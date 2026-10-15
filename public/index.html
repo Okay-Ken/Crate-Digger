@@ -151,13 +151,13 @@ a.btn{text-decoration:none;display:inline-block}
         <button class="btn" id="clear" style="padding:5px 10px;font-size:12px">Clear</button>
       </div>
     </div>
-    <div class="meter"><i id="meter"></i></div>
-    <ol id="list"></ol>
-    <div class="row" id="confirmClear" hidden>
+    <div class="row" style="justify-content:flex-end" id="confirmClear" hidden>
       <span class="hint">Clear the whole list?</span>
       <button class="btn primary" id="yesClear">Yes, clear</button>
       <button class="btn" id="noClear">Keep it</button>
     </div>
+    <div class="meter"><i id="meter"></i></div>
+    <ol id="list"></ol>
   </section>
 
   <p class="foot">Edit any track name in place if the search comes up wrong; the buttons update as you type. Bootlegs and edits usually live on SoundCloud or Bandcamp, so the "Free DL" button searches for the producer's download gate.</p>
@@ -287,7 +287,7 @@ $('file').onchange = e=>{
 };
 $('clear').onclick = ()=> $('confirmClear').hidden = false;
 $('noClear').onclick = ()=> $('confirmClear').hidden = true;
-$('yesClear').onclick = ()=>{ tracks = []; isExample = false; save(); renderList(); $('confirmClear').hidden = true; };
+$('yesClear').onclick = ()=>{ tracks = []; isExample = false; save(); renderList(); $('confirmClear').hidden = true; $('importStatus').classList.remove('err'); $('importStatus').textContent = 'List cleared. Paste a playlist link to start fresh.'; };
 $('copy').onclick = async ()=>{
   const text = tracks.filter(t=>!t.got).map(t=>t.q).join('\n');
   try{ await navigator.clipboard.writeText(text); $('copy').textContent='Copied'; }
