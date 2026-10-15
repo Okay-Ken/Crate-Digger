@@ -83,6 +83,7 @@ body{margin:0}
 .apple.yes::before{background:var(--got)}
 .apple a{color:var(--got);font-weight:600;text-decoration:none}
 .err{color:#c43d3d}
+.proTag{color:var(--accent)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top, 0px));background:var(--ink);color:var(--bg);font-size:13px;padding:10px 14px;border-radius:8px;z-index:20;max-width:calc(100% - 32px)}
 .help{border-top:1px dashed var(--line);padding-top:10px}
 .help summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--accent)}
@@ -131,8 +132,16 @@ a.btn{text-decoration:none;display:inline-block}
   </section>
   <div class="row hint" id="proOn" hidden><span class="ok">Pro unlocked</span><span>· your list saves to your key</span><button class="linkbtn" id="signOut">Remove key from this device</button></div>
 
+  <section class="paste" aria-label="Find one track">
+    <label class="label" for="one">Find one track · free</label>
+    <div class="row">
+      <input id="one" class="linkin" autocomplete="off" placeholder="Artist - Song, like Sub Focus - Overcome">
+      <button class="btn primary" id="find">Find it</button>
+    </div>
+  </section>
+
   <section class="paste" aria-label="Import a playlist">
-    <label class="label" for="link">Paste a playlist link</label>
+    <label class="label" for="link">Paste a playlist link<span class="proTag"> · Pro</span></label>
     <div class="row">
       <input id="link" class="linkin" inputmode="url" autocomplete="off" placeholder="youtube.com/playlist?list=… or soundcloud.com/…/sets/…">
       <button class="btn primary" id="import">Import</button>
@@ -151,7 +160,7 @@ a.btn{text-decoration:none;display:inline-block}
   </section>
 
   <section class="paste" aria-label="Add tracks">
-    <label class="label" for="input">Or paste track names, one per line</label>
+    <label class="label" for="input">Or paste track names, one per line<span class="proTag"> · Pro</span></label>
     <textarea id="input" placeholder="Sub Focus - Overcome&#10;Dimension - Organ (Official Video)&#10;1. Chase &amp; Status - Baddadan [HD]"></textarea>
     <div class="row">
       <button class="btn primary" id="add">Add to list</button>
@@ -381,6 +390,7 @@ function commitExample(){ isExample = false; }
 function addLines(text, replace){
   const items = parse(text);
   if(!items.length) return;
+  if(!pro){ toast('Adding a whole list is a Pro feature. Use Find one track, or unlock Pro above.'); $('keyIn').focus(); return; }
   if(replace || isExample) tracks = [];
   const have = new Set(tracks.map(t=>t.q.toLowerCase()));
   items.forEach(q=>{ if(!have.has(q.toLowerCase())){ tracks.push({q, got:false}); have.add(q.toLowerCase()); } });
@@ -406,7 +416,7 @@ $('copy').onclick = async ()=>{
 // ---- Apple / iTunes availability ----
 let appleTimer = null, appleBusy = false;
 function paintApple(li, q){
-  const el = li.querySelector('.apple'); el.hidden = !pro; if(!pro) return;
+  const el = li.querySelector('.apple');
   const r = apple[q.trim().toLowerCase()];
   el.className = 'apple' + (r && r.found ? ' yes' : '');
   if(!r){ el.textContent = 'iTunes: checking…'; return; }
@@ -420,7 +430,7 @@ function queueApple(){
   appleTimer = setTimeout(nextApple, 1200);
 }
 async function nextApple(){
-  if(appleBusy || !pro) return;
+  if(appleBusy) return;
   const t = tracks.find(t => t.q.trim().length > 3 && !apple[t.q.trim().toLowerCase()]);
   if(!t) return;
   appleBusy = true;
@@ -481,6 +491,7 @@ function api(url, opts = {}){
   return fetch(url, opts);
 }
 function paintPro(){
+  document.querySelectorAll('.proTag').forEach(el => el.hidden = !paywall || pro);
   $('proLocked').hidden = !paywall || pro;
   $('proOn').hidden = !paywall || !pro;
 }
@@ -527,6 +538,21 @@ async function pushList(){
   try{ await api('/api/lists', {method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({tracks})}); }catch(e){}
 }
 
+// ---- Find one track (free) ----
+function findOne(){
+  const q = clean($('one').value);
+  if(!q){ toast('Type an artist and song first.'); return; }
+  if(pro){
+    if(!tracks.some(t => t.q.toLowerCase() === q.toLowerCase())) tracks.unshift({q, got:false});
+  } else {
+    tracks = [{q, got:false}];
+  }
+  isExample = false; save(); renderList(); $('one').value = '';
+  document.getElementById('list').scrollIntoView({behavior:'smooth', block:'start'});
+}
+$('find').onclick = findOne;
+$('one').addEventListener('keydown', e => { if(e.key === 'Enter') findOne(); });
+
 // ---- Record pool buttons: copy the track name on the way out ----
 document.addEventListener('click', e => {
   const a = e.target.closest('a[data-copy]'); if(!a) return;
@@ -562,7 +588,7 @@ function paintShop(){
   $('shopMore').innerHTML = stores.slice(1).map(st => `<a href="${st.url(enc, t.q)}" target="_blank" rel="noopener"${st.pool ? ` data-copy="${t.q.trim().replace(/"/g,'&quot;')}"` : ''}>${st.name}</a>`).join('') +
     '';
 }
-$('shopStart').onclick = ()=>{ $('shop').hidden = false; document.body.classList.add('shopping'); shopIdx = nextNeeded(0); paintShop(); };
+$('shopStart').onclick = ()=>{ if(!pro){ toast('Shopping mode is a Pro feature.'); return; } $('shop').hidden = false; document.body.classList.add('shopping'); shopIdx = nextNeeded(0); paintShop(); };
 $('shopClose').onclick = ()=>{ $('shop').hidden = true; document.body.classList.remove('shopping'); };
 $('shopGot').onclick = ()=>{ if(shopIdx < 0) return; tracks[shopIdx].got = true; commitExample(); save(); renderList(); shopIdx = nextNeeded(shopIdx + 1); paintShop(); };
 $('shopSkip').onclick = ()=>{ if(shopIdx < 0) return; shopIdx = nextNeeded(shopIdx + 1); paintShop(); };

@@ -1,4 +1,3 @@
-import { requirePro } from "../lib/license.mjs";
 // GET /api/itunes?q=<Artist - Title>
 // Checks Apple's free iTunes Search API and returns the best match:
 // { found: true, artist, title, price, currency, url } or { found: false }
@@ -28,8 +27,6 @@ function score(query, r) {
 }
 
 export default async (req) => {
-  const blocked = await requirePro(req);
-  if (blocked) return blocked;
   const q = (new URL(req.url).searchParams.get("q") || "").trim().slice(0, 200);
   if (!q) return json({ error: "Missing track name." }, 400);
   try {
