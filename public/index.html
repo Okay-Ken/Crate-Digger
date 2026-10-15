@@ -205,34 +205,48 @@ a.btn{text-decoration:none;display:inline-block}
 const STORES = [
   {id:'beatport', name:'Beatport', fmt:'WAV', url:q=>`https://www.beatport.com/search?q=${q}`},
   {id:'7digital', name:'7digital', fmt:'MP3/FLAC', url:q=>`https://us.7digital.com/search?q=${q}`},
+  {id:'qobuz', name:'Qobuz', fmt:'FLAC', url:q=>`https://www.qobuz.com/us-en/search?q=${q}`},
+  {id:'amazon', name:'Amazon', fmt:'MP3', url:q=>`https://www.amazon.com/s?k=${q}&i=digital-music`},
+  {id:'itunes', name:'iTunes', fmt:'AAC', url:(q,raw)=>{ const a = raw && apple[raw.trim().toLowerCase()]; return a && a.found ? a.url : `https://music.apple.com/us/search?term=${q}`; }},
   {id:'bandcamp', name:'Bandcamp', fmt:'FLAC/WAV', url:q=>`https://bandcamp.com/search?q=${q}&item_type=t`},
   {id:'juno', name:'Juno', fmt:'WAV', url:q=>`https://www.junodownload.com/search/?solrorder=relevancy&q%5Ball%5D%5B0%5D=${q}`},
   {id:'traxsource', name:'Traxsource', fmt:'WAV', url:q=>`https://www.traxsource.com/search?term=${q}`},
-  {id:'qobuz', name:'Qobuz', fmt:'FLAC', url:q=>`https://www.qobuz.com/us-en/search?q=${q}`},
+  {id:'hdtracks', name:'HDtracks', fmt:'Hi-res', url:q=>`https://www.google.com/search?q=site%3Ahdtracks.com%20${q}`},
   {id:'freedl', name:'Free DL', fmt:'free', url:q=>`https://www.google.com/search?q=${q}%20(site%3Ahypeddit.com%20OR%20site%3Atoneden.io%20OR%20%22free%20download%22)`},
   {id:'soundcloud', name:'SoundCloud', fmt:'stream', url:q=>`https://soundcloud.com/search/sounds?q=${q}`},
 ];
-const DEFAULT_ON = ['beatport','7digital','bandcamp','juno','qobuz','freedl','soundcloud'];
-// Store order per genre family (only stores the user has switched on are shown)
+const DEFAULT_ON = ['beatport','7digital','qobuz','amazon','itunes','bandcamp','juno','traxsource','hdtracks','freedl','soundcloud'];
+// Store order per genre family. Only stores the user has switched on are shown; anything not listed goes last.
 const ROUTES = {
-  electronic: ['beatport','juno','traxsource','7digital','bandcamp','freedl','soundcloud','qobuz'],
-  hiphop:     ['7digital','qobuz','bandcamp','freedl','soundcloud','beatport','juno','traxsource'],
-  soundtrack: ['bandcamp','7digital','qobuz','freedl','soundcloud','beatport','juno','traxsource'],
-  other:      ['7digital','qobuz','bandcamp','freedl','soundcloud','beatport','juno','traxsource'],
+  electronic: ['beatport','juno','traxsource','7digital','bandcamp','qobuz','amazon','itunes','freedl','soundcloud'],
+  hiphop:     ['7digital','qobuz','amazon','itunes','juno','bandcamp','freedl','soundcloud'],
+  rnb:        ['7digital','qobuz','amazon','itunes','traxsource','juno','hdtracks','bandcamp'],
+  reggae:     ['juno','7digital','amazon','itunes','bandcamp','qobuz','freedl','soundcloud'],
+  latin:      ['7digital','amazon','itunes','qobuz','beatport','traxsource','freedl'],
+  afro:       ['7digital','traxsource','beatport','amazon','itunes','juno','qobuz','freedl'],
+  soundtrack: ['bandcamp','7digital','qobuz','amazon','itunes','hdtracks'],
+  hires:      ['qobuz','hdtracks','7digital','amazon','itunes','bandcamp'],
+  other:      ['7digital','qobuz','amazon','itunes','bandcamp','hdtracks','freedl'],
 };
-const FAMILY_LABEL = {electronic:'Electronic', hiphop:'Hip-hop / R&B', soundtrack:'Soundtrack', other:''};
+const FAMILY_LABEL = {electronic:'Electronic', hiphop:'Hip-hop / Rap', rnb:'R&B / Soul', reggae:'Reggae / Dancehall', latin:'Latin', afro:'Afrobeats', soundtrack:'Soundtrack', hires:'Jazz / Classical', other:''};
 function family(genre){
   const g = String(genre || '').toLowerCase();
   if(!g) return null;
+  if(/reggae|dancehall|soca|dub\b|ska|caribbean/.test(g)) return 'reggae';
+  if(/latin|reggaet|urbano|salsa|bachata|cumbia|regional mexican|m[uú]sica mexicana|banda|corrido|tropical|brazil|sertanejo|funk carioca/.test(g)) return 'latin';
+  if(/afro|amapiano|highlife|african/.test(g)) return 'afro';
+  if(/r&b|soul|funk|motown|neo-soul/.test(g)) return 'rnb';
+  if(/hip.?hop|rap|trap|grime|drill/.test(g)) return 'hiphop';
   if(/dance|electronic|house|techno|trance|dubstep|drum|bass|edm|electronica|breakbeat|garage|hardstyle/.test(g)) return 'electronic';
-  if(/hip.?hop|rap|r&b|soul|trap|grime|drill/.test(g)) return 'hiphop';
   if(/soundtrack|video game|anime|score|film|tv/.test(g)) return 'soundtrack';
+  if(/jazz|classical|opera|blues/.test(g)) return 'hires';
   return 'other';
 }
 function orderFor(q){
   const r = apple[q.trim().toLowerCase()];
   const fam = r && r.genre ? family(r.genre) : null;
-  const order = fam ? ROUTES[fam] : STORES.map(x => x.id);
+  const base = fam ? ROUTES[fam] : STORES.map(x => x.id);
+  const order = base.concat(STORES.map(x => x.id).filter(id => !base.includes(id)));
   return order.filter(id => on.includes(id)).map(id => STORES.find(x => x.id === id));
 }
 const EXAMPLES = ['Sub Focus - Overcome','Dimension - Organ','Chase & Status - Baddadan','Wilkinson - Afterglow','Culture Shock - City Lights'];
@@ -246,7 +260,7 @@ const JUNK = /\b(official|video|audio|lyrics?|visuali[sz]er|music video|hd|hq|4k
 let tracks = store.get('cd.tracks', null);
 let isExample = false;
 if(!tracks) tracks = [];
-let on = store.get('cd.stores2', DEFAULT_ON).filter(id => STORES.some(x => x.id === id));
+let on = store.get('cd.stores3', DEFAULT_ON).filter(id => STORES.some(x => x.id === id));
 let apple = store.get('cd.apple2', {});
 
 function clean(line){
@@ -305,7 +319,7 @@ function fromCSV(text){
 function parse(text){ const csv = fromCSV(text); return (csv || text.split(/\r?\n/)).map(clean).filter(Boolean); }
 
 const $ = id => document.getElementById(id);
-function save(){ if(!isExample){ store.set('cd.tracks', tracks); queueSync(); } store.set('cd.stores2', on); }
+function save(){ if(!isExample){ store.set('cd.tracks', tracks); queueSync(); } store.set('cd.stores3', on); }
 
 function renderStores(){
   const el = $('stores'); el.innerHTML = '';
@@ -323,7 +337,7 @@ function renderStores(){
 
 function linksHTML(q){
   const enc = encodeURIComponent(q.trim());
-  return orderFor(q).map(st => `<a href="${st.url(enc)}" target="_blank" rel="noopener">${st.name} <small>${st.fmt}</small></a>`).join('');
+  return orderFor(q).map(st => `<a href="${st.url(enc, q)}" target="_blank" rel="noopener">${st.name} <small>${st.fmt}</small></a>`).join('');
 }
 
 var renderList = function(){
@@ -521,10 +535,10 @@ function paintShop(){
   $('shopLeft').textContent = `Track ${shopIdx + 1} · ${left} left`;
   $('shopName').textContent = t.q;
   $('shopBuy').hidden = !stores.length; $('shopGot').hidden = false; $('shopSkip').hidden = false;
-  if(stores.length){ $('shopBuy').href = stores[0].url(enc); $('shopBuy').textContent = `Open ${stores[0].name} (${stores[0].fmt})`; }
+  if(stores.length){ $('shopBuy').href = stores[0].url(enc, t.q); $('shopBuy').textContent = `Open ${stores[0].name} (${stores[0].fmt})`; }
   const a = apple[t.q.trim().toLowerCase()];
-  $('shopMore').innerHTML = stores.slice(1).map(st => `<a href="${st.url(enc)}" target="_blank" rel="noopener">${st.name}</a>`).join('') +
-    (a && a.found ? `<a href="${a.url}" target="_blank" rel="noopener">iTunes${a.price ? ' $' + a.price.toFixed(2) : ''}</a>` : '');
+  $('shopMore').innerHTML = stores.slice(1).map(st => `<a href="${st.url(enc, t.q)}" target="_blank" rel="noopener">${st.name}</a>`).join('') +
+    '';
 }
 $('shopStart').onclick = ()=>{ $('shop').hidden = false; document.body.classList.add('shopping'); shopIdx = nextNeeded(0); paintShop(); };
 $('shopClose').onclick = ()=>{ $('shop').hidden = true; document.body.classList.remove('shopping'); };
