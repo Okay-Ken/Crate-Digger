@@ -4,8 +4,16 @@
 
 const cache = new Map(); // key -> { ok, until }
 
+export function productId() {
+  for (const k of ["LEMONSQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMONSQUEEZY_PRODUCT", "PRODUCT_ID"]) {
+    const v = String(Netlify.env.get(k) || "").trim().replace(/^["']|["']$/g, "").replace(/[^0-9]/g, "");
+    if (v) return v;
+  }
+  return "";
+}
+
 export function paywallOn() {
-  return Boolean(Netlify.env.get("LEMONSQUEEZY_PRODUCT_ID"));
+  return Boolean(productId());
 }
 
 export async function validateKey(key) {
@@ -22,7 +30,7 @@ export async function validateKey(key) {
       body: new URLSearchParams({ license_key: key }),
     });
     const data = await res.json();
-    const product = String(Netlify.env.get("LEMONSQUEEZY_PRODUCT_ID") || "");
+    const product = productId();
     const status = data?.license_key?.status;
     ok = Boolean(data?.valid) && String(data?.meta?.product_id) === product && status !== "disabled" && status !== "expired";
   } catch (e) {

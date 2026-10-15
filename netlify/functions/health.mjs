@@ -1,3 +1,4 @@
+import { productId } from "../lib/license.mjs";
 // GET /api/health -> shows which settings this deploy can see (true/false only, never the values)
 
 export default async () => {
@@ -9,7 +10,9 @@ export default async () => {
     youtube_key_length: yt.trim().length,
     youtube_key_has_spaces_or_quotes: /^\s|\s$|["']/.test(yt),
     SOUNDCLOUD: has("SOUNDCLOUD_CLIENT_ID") && has("SOUNDCLOUD_CLIENT_SECRET"),
-    PAYWALL_ON: has("LEMONSQUEEZY_PRODUCT_ID"),
+    PAYWALL_ON: Boolean(productId()),
+    product_id_digits: productId().length,
+    lemon_variable_names_seen: Object.keys(process.env).filter((k) => /lemon|product/i.test(k)),
     BUY_URL: has("BUY_URL"),
     context: Netlify.env.get("CONTEXT") || "unknown",
   };
