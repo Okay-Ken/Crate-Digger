@@ -83,6 +83,7 @@ body{margin:0}
 .apple.yes::before{background:var(--got)}
 .apple a{color:var(--got);font-weight:600;text-decoration:none}
 .err{color:#c43d3d}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top, 0px));background:var(--ink);color:var(--bg);font-size:13px;padding:10px 14px;border-radius:8px;z-index:20;max-width:calc(100% - 32px)}
 .help{border-top:1px dashed var(--line);padding-top:10px}
 .help summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--accent)}
 .help ol{margin:10px 0 6px;padding-left:22px;display:flex;flex-direction:column;gap:6px;font-size:14px}
@@ -163,6 +164,7 @@ a.btn{text-decoration:none;display:inline-block}
 
   <section aria-label="Stores" style="display:flex;flex-direction:column;gap:8px">
     <div class="label">Stores to show (order adapts to each track's genre)</div>
+    <div class="hint">Have a record pool subscription? Turn on BPM Supreme, DJcity, ZipDJ or Club Killers. Those buttons copy the track name, then open the pool so you can paste it into their search.</div>
     <div class="stores" id="stores"></div>
   </section>
 
@@ -214,16 +216,22 @@ const STORES = [
   {id:'hdtracks', name:'HDtracks', fmt:'Hi-res', url:q=>`https://www.google.com/search?q=site%3Ahdtracks.com%20${q}`},
   {id:'freedl', name:'Free DL', fmt:'free', url:q=>`https://www.google.com/search?q=${q}%20(site%3Ahypeddit.com%20OR%20site%3Atoneden.io%20OR%20%22free%20download%22)`},
   {id:'soundcloud', name:'SoundCloud', fmt:'stream', url:q=>`https://soundcloud.com/search/sounds?q=${q}`},
+  // Record pools (DJ subscriptions). Off by default. They need a login, so the button copies the track name and opens the pool.
+  {id:'bpmsupreme', name:'BPM Supreme', fmt:'pool', pool:true, url:()=>`https://www.bpmsupreme.com/`},
+  {id:'djcity', name:'DJcity', fmt:'pool', pool:true, url:()=>`https://www.djcity.com/`},
+  {id:'zipdj', name:'ZipDJ', fmt:'pool', pool:true, url:()=>`https://www.zipdj.com/`},
+  {id:'clubkillers', name:'Club Killers', fmt:'pool', pool:true, url:()=>`https://www.clubkillers.com/`},
 ];
+const POOLS = ['bpmsupreme','djcity','zipdj','clubkillers'];
 const DEFAULT_ON = ['beatport','7digital','qobuz','amazon','itunes','bandcamp','juno','traxsource','hdtracks','freedl','soundcloud'];
 // Store order per genre family. Only stores the user has switched on are shown; anything not listed goes last.
 const ROUTES = {
-  electronic: ['beatport','juno','traxsource','7digital','bandcamp','qobuz','amazon','itunes','freedl','soundcloud'],
-  hiphop:     ['7digital','qobuz','amazon','itunes','juno','bandcamp','freedl','soundcloud'],
-  rnb:        ['7digital','qobuz','amazon','itunes','traxsource','juno','hdtracks','bandcamp'],
-  reggae:     ['juno','7digital','amazon','itunes','bandcamp','qobuz','freedl','soundcloud'],
-  latin:      ['7digital','amazon','itunes','qobuz','beatport','traxsource','freedl'],
-  afro:       ['7digital','traxsource','beatport','amazon','itunes','juno','qobuz','freedl'],
+  electronic: ['beatport','bpmsupreme','djcity','zipdj','clubkillers','juno','traxsource','7digital','bandcamp','qobuz','amazon','itunes','freedl','soundcloud'],
+  hiphop:     ['bpmsupreme','djcity','zipdj','clubkillers','7digital','qobuz','amazon','itunes','juno','bandcamp','freedl','soundcloud'],
+  rnb:        ['bpmsupreme','djcity','zipdj','clubkillers','7digital','qobuz','amazon','itunes','traxsource','juno','hdtracks','bandcamp'],
+  reggae:     ['bpmsupreme','djcity','zipdj','clubkillers','juno','7digital','amazon','itunes','bandcamp','qobuz','freedl','soundcloud'],
+  latin:      ['bpmsupreme','djcity','zipdj','clubkillers','7digital','amazon','itunes','qobuz','beatport','traxsource','freedl'],
+  afro:       ['bpmsupreme','djcity','zipdj','clubkillers','7digital','traxsource','beatport','amazon','itunes','juno','qobuz','freedl'],
   soundtrack: ['bandcamp','7digital','qobuz','amazon','itunes','hdtracks'],
   hires:      ['qobuz','hdtracks','7digital','amazon','itunes','bandcamp'],
   other:      ['7digital','qobuz','amazon','itunes','bandcamp','hdtracks','freedl'],
@@ -337,7 +345,7 @@ function renderStores(){
 
 function linksHTML(q){
   const enc = encodeURIComponent(q.trim());
-  return orderFor(q).map(st => `<a href="${st.url(enc, q)}" target="_blank" rel="noopener">${st.name} <small>${st.fmt}</small></a>`).join('');
+  return orderFor(q).map(st => `<a href="${st.url(enc, q)}" target="_blank" rel="noopener"${st.pool ? ` data-copy="${q.trim().replace(/"/g,'&quot;')}" title="Copies the track name, then opens ${st.name}"` : ''}>${st.name} <small>${st.pool ? 'pool · copies name' : st.fmt}</small></a>`).join('');
 }
 
 var renderList = function(){
@@ -519,6 +527,19 @@ async function pushList(){
   try{ await api('/api/lists', {method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({tracks})}); }catch(e){}
 }
 
+// ---- Record pool buttons: copy the track name on the way out ----
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-copy]'); if(!a) return;
+  const text = a.dataset.copy;
+  try{ navigator.clipboard.writeText(text).then(()=>toast(`Copied "${text}". Paste it into the search.`), ()=>toast(`Search for: ${text}`)); }
+  catch(err){ toast(`Search for: ${text}`); }
+});
+function toast(msg){
+  let t = $('toast');
+  if(!t){ t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(()=>{ t.hidden = true; }, 3500);
+}
+
 // ---- Shopping mode: one track at a time ----
 let shopIdx = -1;
 function nextNeeded(from){
@@ -535,9 +556,10 @@ function paintShop(){
   $('shopLeft').textContent = `Track ${shopIdx + 1} · ${left} left`;
   $('shopName').textContent = t.q;
   $('shopBuy').hidden = !stores.length; $('shopGot').hidden = false; $('shopSkip').hidden = false;
-  if(stores.length){ $('shopBuy').href = stores[0].url(enc, t.q); $('shopBuy').textContent = `Open ${stores[0].name} (${stores[0].fmt})`; }
+  if(stores.length){ $('shopBuy').href = stores[0].url(enc, t.q);
+    if(stores[0].pool) $('shopBuy').dataset.copy = t.q.trim(); else delete $('shopBuy').dataset.copy; $('shopBuy').textContent = `Open ${stores[0].name} (${stores[0].fmt})`; }
   const a = apple[t.q.trim().toLowerCase()];
-  $('shopMore').innerHTML = stores.slice(1).map(st => `<a href="${st.url(enc, t.q)}" target="_blank" rel="noopener">${st.name}</a>`).join('') +
+  $('shopMore').innerHTML = stores.slice(1).map(st => `<a href="${st.url(enc, t.q)}" target="_blank" rel="noopener"${st.pool ? ` data-copy="${t.q.trim().replace(/"/g,'&quot;')}"` : ''}>${st.name}</a>`).join('') +
     '';
 }
 $('shopStart').onclick = ()=>{ $('shop').hidden = false; document.body.classList.add('shopping'); shopIdx = nextNeeded(0); paintShop(); };
