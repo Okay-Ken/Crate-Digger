@@ -49,6 +49,7 @@ export default async (req) => {
       price: r.trackPrice > 0 ? r.trackPrice : null,
       currency: r.currency,
       url: r.trackViewUrl,
+      genre: r.primaryGenreName || "",
     });
   } catch (e) {
     return json({ found: false, busy: true });
