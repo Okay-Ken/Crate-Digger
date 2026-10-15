@@ -192,17 +192,16 @@ const STORES = [
   {id:'juno', name:'Juno', fmt:'WAV', url:q=>`https://www.junodownload.com/search/?solrorder=relevancy&q%5Ball%5D%5B0%5D=${q}`},
   {id:'traxsource', name:'Traxsource', fmt:'WAV', url:q=>`https://www.traxsource.com/search?term=${q}`},
   {id:'qobuz', name:'Qobuz', fmt:'FLAC', url:q=>`https://www.qobuz.com/us-en/search?q=${q}`},
-  {id:'steam', name:'Steam', fmt:'OST', url:q=>`https://store.steampowered.com/search/?term=${q}%20soundtrack`},
   {id:'freedl', name:'Free DL', fmt:'free', url:q=>`https://www.google.com/search?q=${q}%20(site%3Ahypeddit.com%20OR%20site%3Atoneden.io%20OR%20%22free%20download%22)`},
   {id:'soundcloud', name:'SoundCloud', fmt:'stream', url:q=>`https://soundcloud.com/search/sounds?q=${q}`},
 ];
-const DEFAULT_ON = ['beatport','7digital','bandcamp','juno','qobuz','steam','freedl','soundcloud'];
+const DEFAULT_ON = ['beatport','7digital','bandcamp','juno','qobuz','freedl','soundcloud'];
 // Store order per genre family (only stores the user has switched on are shown)
 const ROUTES = {
-  electronic: ['beatport','juno','traxsource','7digital','bandcamp','freedl','soundcloud','qobuz','steam'],
-  hiphop:     ['7digital','qobuz','bandcamp','freedl','soundcloud','beatport','juno','traxsource','steam'],
-  soundtrack: ['bandcamp','steam','7digital','qobuz','freedl','soundcloud','beatport','juno','traxsource'],
-  other:      ['7digital','qobuz','bandcamp','freedl','soundcloud','beatport','juno','traxsource','steam'],
+  electronic: ['beatport','juno','traxsource','7digital','bandcamp','freedl','soundcloud','qobuz'],
+  hiphop:     ['7digital','qobuz','bandcamp','freedl','soundcloud','beatport','juno','traxsource'],
+  soundtrack: ['bandcamp','7digital','qobuz','freedl','soundcloud','beatport','juno','traxsource'],
+  other:      ['7digital','qobuz','bandcamp','freedl','soundcloud','beatport','juno','traxsource'],
 };
 const FAMILY_LABEL = {electronic:'Electronic', hiphop:'Hip-hop / R&B', soundtrack:'Soundtrack', other:''};
 function family(genre){
@@ -230,7 +229,7 @@ const JUNK = /\b(official|video|audio|lyrics?|visuali[sz]er|music video|hd|hq|4k
 let tracks = store.get('cd.tracks', null);
 let isExample = false;
 if(!tracks || !tracks.length){ tracks = EXAMPLES.map(q=>({q, got:false})); isExample = true; }
-let on = store.get('cd.stores2', DEFAULT_ON);
+let on = store.get('cd.stores2', DEFAULT_ON).filter(id => STORES.some(x => x.id === id));
 let apple = store.get('cd.apple2', {});
 
 function clean(line){
@@ -260,7 +259,33 @@ function clean(line){
   }
   return s;
 }
-function parse(text){ return text.split(/\r?\n/).map(clean).filter(Boolean); }
+function csvRows(text){
+  const rows = []; let row = [], cell = '', q = false;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(q){ if(c === '"'){ if(text[i+1] === '"'){ cell += '"'; i++; } else q = false; } else cell += c; }
+    else if(c === '"') q = true;
+    else if(c === ','){ row.push(cell); cell = ''; }
+    else if(c === '\n' || c === '\r'){ if(c === '\r' && text[i+1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if(cell || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+function fromCSV(text){
+  const first = text.split(/\r?\n/)[0] || '';
+  if(!first.includes(',')) return null;
+  const rows = csvRows(text); const head = (rows[0] || []).map(h => h.trim().toLowerCase());
+  const ti = head.findIndex(h => /^(track ?name|track title|title|song|name)$/.test(h));
+  const ai = head.findIndex(h => /^(artist ?name(\(s\))?|artists?|artist name\(s\))$/.test(h));
+  if(ti < 0) return null;
+  return rows.slice(1).map(r => {
+    const t = (r[ti] || '').trim(); if(!t) return '';
+    const a = ai >= 0 ? (r[ai] || '').split(/[;,]/)[0].trim() : '';
+    return a && !t.includes(' - ') ? `${a} - ${t}` : t;
+  });
+}
+function parse(text){ const csv = fromCSV(text); return (csv || text.split(/\r?\n/)).map(clean).filter(Boolean); }
 
 const $ = id => document.getElementById(id);
 function save(){ if(!isExample){ store.set('cd.tracks', tracks); queueSync(); } store.set('cd.stores2', on); }
